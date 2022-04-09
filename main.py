@@ -15,7 +15,11 @@ from sklearn.metrics import confusion_matrix, classification_report, accuracy_sc
 from sklearn.model_selection import train_test_split
 from keras.callbacks import EarlyStopping
 
-train_df = pd.read_csv('./samples/train1.csv')
+pd1 = pd.read_csv('./samples/train1.csv')
+pd2 = pd.read_csv('./samples/train2.csv')
+pd3 = pd.read_csv('./samples/train3.csv')
+
+train_df = pd.concat([pd1, pd2, pd3], axis=0, ignore_index=True)
 test_df = pd.read_csv('./samples/test1.csv')
 print('Number of rows and columns: ', train_df.shape, test_df.shape)
 
@@ -71,7 +75,7 @@ print(y_train.shape)
 
 model = Sequential()
 model.add(LSTM(128, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2]), activation='relu'))
-# model.add(LSTM(4, return_sequences=True, activation='relu'))
+model.add(LSTM(32, return_sequences=True))
 # model.add(Dropout(0.2))
 # model.add(LSTM(4, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2])))
 # model.add(LSTM(16))
@@ -112,8 +116,15 @@ def plot_history(history):
 
 # plot_history(history)
 
+test_result = np.flatten(test_result)
 print(test_result.shape)
 print(test_result)
+test_result = sc.inverse_transform(test_result)
+f = open('./result_relu.txt', 'w')
+f.write(test_result.shape)
+f.write('\n')
+f.write(test_result)
+f.close()
 
 # plt.plot(test_df.loc[:, 'time'], test_result, color = 'blue', label = 'Model Data')
 # plt.show()
