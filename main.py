@@ -74,7 +74,7 @@ print(y_train.shape)
 # print(y_train.shape)
 
 model = Sequential()
-model.add(LSTM(128, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2]), activation='relu'))
+model.add(LSTM(128, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2]), activation='elu'))
 model.add(LSTM(32, return_sequences=True))
 # model.add(Dropout(0.2))
 # model.add(LSTM(4, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2])))
@@ -116,7 +116,13 @@ def plot_history(history):
 
 # plot_history(history)
 
-test_result = np.flatten(test_result)
+def flatten(X):
+    flattened_X = np.empty((X.shape[0], X.shape[2]))  # sample x features array.
+    for i in range(X.shape[0]):
+        flattened_X[i] = X[i, (X.shape[1] - 1), :]
+    return flattened_X
+
+test_result = flatten(test_result)
 print(test_result.shape)
 print(test_result)
 test_result = sc.inverse_transform(test_result)
