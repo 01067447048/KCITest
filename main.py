@@ -74,15 +74,17 @@ print(y_train.shape)
 # print(y_train.shape)
 
 model = Sequential()
-model.add(LSTM(128, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2]), activation='elu'))
-model.add(LSTM(32, return_sequences=True, activation='relu'))
+# model.add(LSTM(128, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2]), activation='relu'))
+# model.add(LSTM(32, return_sequences=True, activation='relu'))
+model.add(Bidirectional(LSTM(128, return_sequences=True, activation='relu'), input_shape=(TIME_STEPS, X_train.shape[2])))
+model.add(Bidirectional(LSTM(32, return_sequences=True, activation='elu')))
 # model.add(LSTM(4, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2])))
 # model.add(LSTM(16))
 model.add(Dense(units=X_train.shape[2]))
 model.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
 model.summary()
 
-history = model.fit(X_train, X_train, epochs=100, batch_size=3600,
+history = model.fit(X_train, X_train, epochs=100, batch_size=5400,
           callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')],  validation_split=0.33)
 
 print(history.history['accuracy'])
