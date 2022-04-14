@@ -13,42 +13,37 @@ from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
+from sklearn import metrics
 from keras.callbacks import EarlyStopping
 
 pd1 = pd.read_csv('./samples/train1.csv')
 pd2 = pd.read_csv('./samples/train2.csv')
 pd3 = pd.read_csv('./samples/train3.csv')
 
-train_df = pd.concat([pd1, pd2, pd3], axis=0, ignore_index=True)
+train_df = pd.concat([pd1, pd3], axis=0, ignore_index=True)
+valid_df = pd2
+# train_df = pd.read_csv('./samples/train1.csv')
 test_df = pd.read_csv('./samples/test1.csv')
 print('Number of rows and columns: ', train_df.shape, test_df.shape)
 
 train_df_without_time = train_df.drop('time', axis=1).drop('attack_P1', axis=1).drop('attack_P2', axis=1).drop('attack_P3', axis=1)
+valid_df_without_time = valid_df.drop('time', axis=1).drop('attack_P1', axis=1).drop('attack_P2', axis=1).drop('attack_P3', axis=1)
 test_df_without_time = test_df.drop('time', axis=1).drop('attack_P1', axis=1).drop('attack_P2', axis=1).drop('attack_P3', axis=1)
 
 print('With out Time & attack Number of rows and columns: ', train_df_without_time.shape, test_df_without_time.shape)
 
 train_set, y_train = train_df_without_time.drop('attack', axis=1).values, train_df_without_time['attack'].values
+valid_set, y_valid = valid_df_without_time.drop('attack', axis=1).values, valid_df_without_time['attack'].values
 test_set, y_test = test_df_without_time.drop('attack', axis=1).values, test_df_without_time['attack'].values
 
 feature = train_set.shape[1]
 
 sc = MinMaxScaler(feature_range=(0, 1))
 training_set_scaled = sc.fit_transform(train_set)
+valid_set_scaled = sc.fit_transform(valid_set)
 test_set_scaled = sc.fit_transform(test_set)
 
-TIME_STEPS = 60
-
-# for i in range(TIME_STEPS, training_set_scaled.shape[0]):
-#     X_train.append(training_set_scaled[i - 60:i, 0])
-#     y_train.append(training_set_scaled[i, 0])
-#
-# for i in range(TIME_STEPS, test_set_scaled.shape[0]):
-#     X_test.append(test_set_scaled[i - 60:i, 0])
-#     y_test.append(test_set_scaled[i, 0])
-#
-# X_train, y_train = np.array(X_train), np.array(y_train)
-# X_test, y_test = np.array(X_test), np.array(y_test)
+TIME_STEPS = 5
 
 def create_sequences(X, y, timesteps=TIME_STEPS):
     output_X = []
@@ -63,34 +58,29 @@ def create_sequences(X, y, timesteps=TIME_STEPS):
     return np.squeeze(np.array(output_X)), np.array(output_y)
 
 X_train, y_train = create_sequences(training_set_scaled, y_train)
+X_valid, y_valid = create_sequences(valid_set_scaled, y_valid)
 X_test, y_test = create_sequences(test_set_scaled, y_test)
 
 print(X_train.shape)
 print(y_train.shape)
-# X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], feature))
-# X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], feature))
-#
-# print(X_train.shape)
-# print(y_train.shape)
 
 model = Sequential()
-# model.add(LSTM(128, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2]), activation='relu'))
-# model.add(LSTM(32, return_sequences=True, activation='relu'))
-model.add(Bidirectional(LSTM(128, return_sequences=True, activation='relu'), input_shape=(TIME_STEPS, X_train.shape[2])))
-model.add(Bidirectional(LSTM(32, return_sequences=True, activation='elu')))
-# model.add(LSTM(4, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2])))
-# model.add(LSTM(16))
-model.add(Dense(units=X_train.shape[2]))
-model.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
+model.add(Bidirectional(LSTM(1024, activation='relu', return_sequences=True), input_shape=(TIME_STEPS, X_train.shape[2])))
+model.add(Bidirectional(LSTM(128, activation='relu', return_sequences=True)))
+model.add(Bidirectional(LSTM(16, activation='relu', return_sequences=False)))
+model.add(RepeatVector(TIME_STEPS))
+model.add(Bidirectional(LSTM(16, return_sequences=True)))
+model.add(Bidirectional(LSTM(128, return_sequences=True)))
+model.add(Bidirectional(LSTM(1024, return_sequences=True)))
+model.add(TimeDistributed(Dense(X_train.shape[2])))
+model.compile(optimizer='adam', loss='mae', metrics=['accuracy'])
 model.summary()
 
-history = model.fit(X_train, X_train, epochs=100, batch_size=5400,
+history = model.fit(X_train, X_train, epochs=100, batch_size=5600,
           callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')],  validation_split=0.33)
 
 print(history.history['accuracy'])
 print(history.history['loss'])
-
-test_result = model.predict(X_test)
 
 def vis(history, name):
     plt.title(f"{name.upper()}")
@@ -122,15 +112,36 @@ def flatten(X):
         flattened_X[i] = X[i, (X.shape[1] - 1), :]
     return flattened_X
 
-test_result = flatten(test_result)
-print(test_result.shape)
-print(test_result)
-test_result = sc.inverse_transform(test_result)
-f = open('./result_relu.txt', 'w')
-f.write(str(test_result.shape))
-f.write('\n')
-f.write(str(test_result))
-f.close()
+valid_result = model.predict(X_valid)
+
+mse = np.mean(np.power(flatten(X_valid) - flatten(valid_result), 2), axis=1)
+
+error_df = pd.DataFrame({'Reconstruction_error':mse,
+                         'True_class':list(y_valid)})
+
+print(valid_df.shape)
+print(error_df.shape)
+print(mse.shape)
+print(error_df.head(10))
+
+precision_rt, recall_rt, threshold_rt = metrics.precision_recall_curve(error_df['True_class'], error_df['Reconstruction_error'])
+print(f'precision : {precision_rt} / recall : {recall_rt} / threshold : {threshold_rt}')
+
+# plt.figure(figsize=(8,5))
+# plt.plot(threshold_rt, precision_rt[1:], label='Precision')
+# plt.plot(threshold_rt, recall_rt[1:], label='Recall')
+# plt.xlabel('Threshold'); plt.ylabel('Precision/Recall')
+# plt.legend()
+# plt.show()
+
+index_cnt = [cnt for cnt, (p, r) in enumerate(zip(precision_rt, recall_rt)) if p==r]
+# index_cnt = index_cnt[0]
+print(index_cnt)
+# print('precision: ',precision_rt[index_cnt],', recall: ',recall_rt[index_cnt])
+
+# fixed Threshold
+# threshold_fixed = threshold_rt[index_cnt]
+# print('threshold: ',threshold_fixed)
 
 # plt.plot(test_df.loc[:, 'time'], test_result, color = 'blue', label = 'Model Data')
 # plt.show()
