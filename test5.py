@@ -16,23 +16,25 @@ from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from keras.callbacks import EarlyStopping
 
-pd1 = pd.read_csv('./samples/2nd_data/train1.csv')
-pd2 = pd.read_csv('./samples/2nd_data/train2.csv')
-pd3 = pd.read_csv('./samples/2nd_data/train3.csv')
+pd1 = pd.read_csv('./samples/train1.csv')
+pd2 = pd.read_csv('./samples/train2.csv')
+pd3 = pd.read_csv('./samples/train3.csv')
 
-# Data Shape : (421201, 88)
-# Columns : timestamp / P1 Data / P2 Data / P3 Data / P4 Data / Attack
 train_df = pd.concat([pd1, pd2, pd3], axis=0, ignore_index=True)
-valid_df = pd.read_csv('./samples/2nd_data/test2.csv')
-test_df = pd.read_csv('./samples/2nd_data/test1.csv')
+valid_df = pd.read_csv('./samples/test2.csv')
+# train_df = pd.read_csv('./samples/train1.csv')
+test_df = pd.read_csv('./samples/test1.csv')
+print('Number of rows and columns: ', train_df.shape, test_df.shape)
 
-train_df = train_df.drop('timestamp', axis=1) # Shape (421201, 87)
-valid_df = valid_df.drop('timestamp', axis=1)
-test_df = test_df.drop('timestamp', axis=1)
+train_df_without_time = train_df.drop('time', axis=1).drop('attack_P1', axis=1).drop('attack_P2', axis=1).drop('attack_P3', axis=1)
+valid_df_without_time = valid_df.drop('time', axis=1).drop('attack_P1', axis=1).drop('attack_P2', axis=1).drop('attack_P3', axis=1)
+test_df_without_time = test_df.drop('time', axis=1).drop('attack_P1', axis=1).drop('attack_P2', axis=1).drop('attack_P3', axis=1)
 
-train_set, y_train = train_df.drop('Attack', axis=1).values, train_df['Attack'].values # Shape (421201, 86) (421201, )
-valid_set, y_valid = valid_df.drop('Attack', axis=1).values, valid_df['Attack'].values
-test_set, y_test = test_df.drop('Attack', axis=1).values, test_df['Attack'].values
+print('With out Time & attack Number of rows and columns: ', train_df_without_time.shape, test_df_without_time.shape)
+
+train_set, y_train = train_df_without_time.drop('attack', axis=1).values, train_df_without_time['attack'].values
+valid_set, y_valid = valid_df_without_time.drop('attack', axis=1).values, valid_df_without_time['attack'].values
+test_set, y_test = test_df_without_time.drop('attack', axis=1).values, test_df_without_time['attack'].values
 
 feature = train_set.shape[1]
 
@@ -62,11 +64,25 @@ X_test, y_test = create_sequences(test_set_scaled, y_test)
 print(X_train.shape)
 print(y_train.shape)
 
+# model = Sequential()
+# model.add(LSTM(128, activation='relu', return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2])))
+# model.add(LSTM(32, activation='elu', return_sequences=True))
+# # model.add(RepeatVector(TIME_STEPS))
+# # model.add(LSTM(32, activation='relu', return_sequences=True))
+# # model.add(LSTM(128, return_sequences=True))
+# # model.add(TimeDistributed(Dense(X_train.shape[2])))
+# model.add(Dense(X_train.shape[2]))
+# model.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
+# model.summary()
+
 model = Sequential()
-model.add(LSTM(128, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2]), activation='relu'))
-model.add(LSTM(32, return_sequences=True))
-model.add(Dense(units=X_train.shape[2]))
-model.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
+model.add(Bidirectional(LSTM(256, activation='relu', return_sequences=True), input_shape=(TIME_STEPS, X_train.shape[2])))
+model.add(Bidirectional(LSTM(32, activation='relu', return_sequences=False)))
+model.add(RepeatVector(TIME_STEPS))
+model.add(Bidirectional(LSTM(32, return_sequences=True)))
+model.add(Bidirectional(LSTM(256, return_sequences=True)))
+model.add(TimeDistributed(Dense(X_train.shape[2])))
+model.compile(optimizer='adam', loss='mae', metrics=['accuracy'])
 model.summary()
 # kernel init
 # isolation forest
