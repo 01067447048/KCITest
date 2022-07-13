@@ -30,6 +30,12 @@ train_df = train_df.drop('timestamp', axis=1) # Shape (421201, 87)
 valid_df = valid_df.drop('timestamp', axis=1)
 test_df = test_df.drop('timestamp', axis=1)
 
+train_df = train_df ** 2
+valid_df = valid_df ** 2
+test_df = test_df ** 2
+
+print(test_df.head(5))
+
 train_set, y_train = train_df.drop('Attack', axis=1).values, train_df['Attack'].values # Shape (421201, 86) (421201, )
 valid_set, y_valid = valid_df.drop('Attack', axis=1).values, valid_df['Attack'].values
 test_set, y_test = test_df.drop('Attack', axis=1).values, test_df['Attack'].values
@@ -64,12 +70,11 @@ print(y_train.shape)
 
 model = Sequential()
 model.add(LSTM(128, return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2]), activation='relu'))
-model.add(LSTM(32, return_sequences=True))
+model.add(LSTM(32, return_sequences=True, activation='relu'))
 model.add(Dense(units=X_train.shape[2]))
 model.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
 model.summary()
-# kernel init
-# isolation forest
+
 history = model.fit(X_train, X_train, epochs=100, batch_size=5600,
           callbacks=[keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')],  validation_split=0.33)
 

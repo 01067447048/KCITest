@@ -76,11 +76,13 @@ print(y_train.shape)
 # model.summary()
 
 model = Sequential()
-model.add(Bidirectional(LSTM(256, activation='relu', return_sequences=True), input_shape=(TIME_STEPS, X_train.shape[2])))
-model.add(Bidirectional(LSTM(32, activation='relu', return_sequences=False)))
+# Encode
+model.add(LSTM(256, activation='relu', return_sequences=True, input_shape=(TIME_STEPS, X_train.shape[2])))
+model.add(LSTM(32, activation='relu', return_sequences=False))
 model.add(RepeatVector(TIME_STEPS))
-model.add(Bidirectional(LSTM(32, return_sequences=True)))
-model.add(Bidirectional(LSTM(256, return_sequences=True)))
+# Decode
+model.add(LSTM(32, return_sequences=True))
+model.add(LSTM(256, return_sequences=True))
 model.add(TimeDistributed(Dense(X_train.shape[2])))
 model.compile(optimizer='adam', loss='mae', metrics=['accuracy'])
 model.summary()
